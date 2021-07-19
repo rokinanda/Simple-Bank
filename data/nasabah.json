@@ -1,1 +1,1 @@
-[{"nama":"nova","accountNumber":"123222","amount":55500,"flag":"nasabah"},{"nama":"roki","accountNumber":"123","amount":0,"flag":"nasabah"},{"nama":"admin","flag":"admin"}]
+[{"nama":"admin","role":"admin"},{"nama":"nova","accountNumber":"123222","amount":62500,"role":"nasabah"},{"nama":"roki","accountNumber":"123","amount":2000,"role":"nasabah"}]

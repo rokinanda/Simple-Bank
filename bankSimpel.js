@@ -40,23 +40,28 @@ const fitur = async () => {
   let options = `Silahkan Pilih Menu di bawah ini:
   1.Transfer
   2.Cek saldo
-  3.Logout
+  3.History
+  4.Logout
   `;
-  if(storageResult.flag === 'admin') {
+  if(storageResult.role === 'admin') {
   options = `Silahkan Pilih Menu di bawah ini:
   1.Daftar
   2.Logout
   `
   }
   answer = await tulisPertanyaan(options)
-  if (answer === '1' && storageResult.flag === 'nasabah') {
+  if (answer === '1' && storageResult.role === 'nasabah') {
     return transfer()
   }
-  if (answer === '1' && storageResult.flag === 'admin') {
+  if (answer === '1' && storageResult.role === 'admin') {
     return daftar()
   }
-  if (answer === '2' && storageResult.flag === 'nasabah') {
+  if (answer === '2' && storageResult.role === 'nasabah') {
     return cekSaldo()
+  }
+  if (answer === '3' && storageResult.role === 'nasabah') {
+    const storageResult = loadJson('data/loginStorage.json')
+    return history(storageResult.nama)
   } else {
     console.log('Terima kasih telah berkunjung')
     rl.close()
@@ -91,6 +96,7 @@ const transfer = async () => {
     filterNasabah.push(searchNasabah)
     filterNasabah.push(storageResult)
     fs.writeFileSync('data/nasabah.json', JSON.stringify(filterNasabah))
+    insertHistory(storageResult, "Transfer", nominal, noRek)
     fs.writeFileSync('data/loginStorage.json', JSON.stringify(storageResult))
     return fitur()
   }
@@ -120,6 +126,20 @@ const deleteStorage = () => {
   }
 }
 
+const history = (name) => {
+  const checkHistory = loadJson('data/history.json')  
+  const getDataHistoryByName = checkHistory.filter((data) => data.nama === name)
+  console.table(getDataHistoryByName)
+  return fitur()
+}
+
+const insertHistory = (data, tipe, jmlTransaksi, rekTujuan) => {
+  const historyData = loadJson('data/history.json')
+  const payload = {...data, date:new Date(), tipe, jmlTransaksi, rekTujuan}
+  historyData.push(payload)
+  fs.writeFileSync('data/history.json', JSON.stringify(historyData))
+}
+
 const daftar = async () => {
   const nama = await tulisPertanyaan('Masukkan nama user: ')
   const nasabahPayload = loadJson('data/nasabah.json')
@@ -128,14 +148,14 @@ const daftar = async () => {
     console.log('sudah terdaftar')
     return fitur()
   }
-  const flag = await tulisPertanyaan('User sebagai? (admin, nasabah): ')
+  const role = await tulisPertanyaan('User sebagai? (admin, nasabah): ')
   let amount;
-  if(flag !== 'admin') { 
+  if(role !== 'admin') { 
     amount = await tulisPertanyaan('Masukkan jumlah uang: ')
   }
-  let payload = {nama, amount, flag}
-  if(flag === 'admin') {
-    payload = {nama, flag}
+  let payload = {nama, amount, role}
+  if(role === 'admin') {
+    payload = {nama, role}
   }
   else {
     nasabahPayload.push(payload)
