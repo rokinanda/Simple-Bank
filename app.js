@@ -7,10 +7,9 @@ const main = async () => {
  Silahkan Pilih Menu di bawah ini:
  1.Login
  2.Keluar
- `)
-
+ Pilih Menu: `)
+   
  mainMenu(answer)
 
 }
-
 main()
