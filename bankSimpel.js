@@ -1,6 +1,8 @@
 const fs = require('fs')
 const readline = require('readline');
-const ora = require('ora');
+const loadJson = require('./dao/loadDataJson')
+const animation = require('./additional/animation')
+const chalk = require('chalk')
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -15,21 +17,6 @@ const tulisPertanyaan = (pertanyaan) => {
   })
 }
 
-const waitAsecond = () => {
-  return new Promise((resolve) => setTimeout(resolve, 2000)) 
-}
-
-const animation = async (text) => {
-  const spinner = ora('Mohon tunggu..')
-  spinner.start();
-  await waitAsecond()
-  spinner.spinner = 'moon';
-  spinner.color = 'yellow';
-  spinner.text = text
-  await waitAsecond()
-  return spinner
-}
-
 const mainMenu = (jawaban) => {
   if (jawaban === '1') {
     return login()
@@ -42,7 +29,7 @@ const login = async () => {
   const username = await tulisPertanyaan('Masukkan username anda: \n')
   const contacts = loadJson('data/nasabah.json')
   const nasabahName = contacts.find((nama) => nama.nama === username)
-  const spinner = await animation('Mencoba login..')
+  const spinner = await animation('Mencoba login..', 1000)
   
   if(!nasabahName) {
     spinner.fail('Gagal login')
@@ -62,7 +49,8 @@ const fitur = async () => {
   2.Cek saldo
   3.Wallet
   4.History
-  5.Logout
+  5.Wishlist
+  6.Logout
   Pilih Menu: `;
   if(storageResult.role === 'admin') {
   options = `Silahkan Pilih Menu di bawah ini:
@@ -90,7 +78,11 @@ const fitur = async () => {
   if (answer === '4' && storageResult.role === 'nasabah') {
     const storageResult = loadJson('data/loginStorage.json')
     return history(storageResult.nama)
-  } else {
+  }
+  if (answer === '5' && storageResult.role === 'nasabah') {
+    return wishlist()
+  }
+   else {
     console.log('Terima kasih telah berkunjung')
     rl.close()
   }
@@ -112,6 +104,10 @@ const transfer = async () => {
   }
   const nominal = await tulisPertanyaan('Masukkan nominal (Minimum 5000): \n')
   const formatNominal = parseInt(nominal)
+  if(formatNominal < 5000) {
+    console.log('Minimal transfer 5000')
+    return fitur()
+  }
   searchNasabah.amount += parseInt(formatNominal)
   storageResult.amount -= parseInt(formatNominal)
   if (storageResult.amount < 0) {
@@ -119,7 +115,9 @@ const transfer = async () => {
     return fitur()
   }
     const res = [searchNasabah.accountNumber, storageResult.accountNumber]
-    console.log(`transfer berhasil, sisa saldo anda ${currencyFormat(storageResult.amount)}`)
+    const spinner = await animation('Sedang melakukan transaksi', 2000)
+    spinner.succeed('Transfer Berhasil')
+    console.log(`sisa saldo anda ${currencyFormat(storageResult.amount)}`)
     const filterNasabah = nasabahPayload.filter((data) => !res.includes(data.accountNumber))
     filterNasabah.push(searchNasabah)
     filterNasabah.push(storageResult)
@@ -135,12 +133,6 @@ const cekSaldo = () => {
   const storageResult = JSON.parse(storage)
   console.log(`sisa saldo anda adalah ${currencyFormat(storageResult.amount)}`)
   return fitur()
-}
-
-const loadJson = (path) => {
-  const file = fs.readFileSync(path, 'utf-8')
-  const contacts = JSON.parse(file)
-  return contacts
 }
 
 const currencyFormat = (number) => {
@@ -161,7 +153,7 @@ const history = (name) => {
   return fitur()
 }
 
-const insertHistory = (data, tipe, jmlTransaksi, {noRek, noHp}) => {
+const insertHistory = (data, tipe, jmlTransaksi, {noRek = '', noHp = ''} = {}) => {
   const historyData = loadJson('data/history.json')
   const payload = {...data, date:new Date(), tipe, jmlTransaksi, rekeningTujuan: noRek, nomorHandphone:noHp}
   historyData.push(payload)
@@ -300,6 +292,84 @@ const walletMenu = async () => {
     insertHistory(storageResult, "Top Up", formatNominal, payload)
     fs.writeFileSync('data/loginStorage.json', JSON.stringify(storageResult))
     return walletMenu()
+  }
+
+  const wishlist = async () => {
+    const option = await tulisPertanyaan(`Silahkan Pilih Menu di bawah ini:
+    1.Daftar wishlist
+    2.Isi wishlist
+    3.Beli Wishlist
+    4.Logout
+    Pilih Menu: `)
+    if (option === '1') {
+      return daftarWishlist()
+    }
+    if (option === '2') {
+      return lihatWishlist()
+    }
+    if (option === '3') {
+      return beliWishlist()
+    }
+    else {
+      console.log('Terima kasih telah berkunjung')
+      rl.close()
+    }
+  }
+
+  const daftarWishlist = async () => {
+    const wishlistPayload = loadJson('data/wishlist.json')
+    const harapan = await tulisPertanyaan(`Tuliskan harapan kamu: `)
+    const duit = await tulisPertanyaan(`Kasih tau berapa uang yang kamu ingin capai: `)
+    const formatDuit = parseInt(duit)
+    const payload = {harapan, duit: formatDuit}
+    wishlistPayload.push(payload)
+    fs.writeFileSync('data/wishlist.json', JSON.stringify(wishlistPayload))
+    return wishlist()
+  }
+
+  const lihatWishlist = () => { 
+    const dataWishlist = loadJson('data/wishlist.json')
+    const storageResult = loadJson('data/loginStorage.json')
+    dataWishlist.forEach((value, index) => {
+      if(storageResult.amount >= value.duit) {
+        return console.log(chalk`{bgGreen.black.bold ${index+1}.${value.harapan} - ${currencyFormat(value.duit)} - (Sudah Tercapai)}`)
+      }
+      console.log(chalk`{bgBlue ${index+1}.${value.harapan} - ${currencyFormat(value.duit)} - (Belum Tercapai)}`)
+    })
+    return wishlist()
+  }
+
+  const beliWishlist = async () => {
+    const dataWishlist = loadJson('data/wishlist.json')
+    const storageResult = loadJson('data/loginStorage.json')
+    const nasabahPayload = loadJson('data/nasabah.json')
+    const payloadNasabah = nasabahPayload.find((data) => data.nama === storageResult.nama)
+    const newPayload = nasabahPayload.filter((data) => data.nama !== storageResult.nama)
+    const getSuccessWishlist = dataWishlist.filter((data) => storageResult.amount >= data.duit)    
+    if (getSuccessWishlist.length === 0) {
+      console.log('Belum ada wishlist yang tercapai')
+      return wishlist()
+    }
+    getSuccessWishlist.forEach((value, index) => {
+      console.log(chalk`{bgGreen.black.bold ${index+1}.${value.harapan} - ${currencyFormat(value.duit)} - (Sudah Tercapai)}`)
+    })
+    const harapan = await tulisPertanyaan(`Pilih Wishlist yang ingin dibeli:`)
+    let filterBuy;
+    let harga = 0
+    getSuccessWishlist.forEach((value, index) => {
+      if(index+1 === parseInt(harapan)) {
+        filterBuy = dataWishlist.filter((data) => data.harapan !== value.harapan)
+        harga = value.duit
+      }
+    })
+    payloadNasabah.amount -= harga
+    storageResult.amount -= harga
+    newPayload.push(payloadNasabah)
+    fs.writeFileSync('data/wishlist.json', JSON.stringify(filterBuy))
+    fs.writeFileSync('data/nasabah.json', JSON.stringify(newPayload))
+    fs.writeFileSync('data/loginStorage.json', JSON.stringify(storageResult))
+    insertHistory(storageResult,"Beli Wishlist", harga)
+    return wishlist()
   }
 
 module.exports = {
